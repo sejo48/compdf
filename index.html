@@ -7,11 +7,11 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <style>
-        /* Evita el scroll y asegura que todo quepa en la pantalla */
         body {
             height: 100vh;
             height: -webkit-fill-available;
             overflow: hidden;
+            background-color: #020617;
         }
         .app-container {
             height: 100vh;
@@ -19,31 +19,28 @@
             display: flex;
             flex-direction: column;
         }
-        .glass { background: rgba(255, 255, 255, 0.05); backdrop-filter: blur(10px); border: 1px solid rgba(255, 255, 255, 0.1); }
-        
         .corner-handle { 
-            width: 40px; height: 40px; background: rgba(16, 185, 129, 0.9); border: 3px solid white; 
+            width: 44px; height: 44px; background: rgba(16, 185, 129, 0.9); border: 3px solid white; 
             border-radius: 50%; position: absolute; pointer-events: auto;
             transform: translate(-50%, -50%); box-shadow: 0 0 15px rgba(0,0,0,0.5);
             z-index: 100; touch-action: none;
         }
-
-        /* Línea de escaneo animada */
         .scan-line { height: 2px; background: #10b981; position: absolute; width: 100%; z-index: 10; top: 0; animation: scan 3s linear infinite; display: none; }
         @keyframes scan { 0% { top: 0; } 100% { top: 100%; } }
 
-        /* Ajuste para que el video no empuje los controles */
         #video-container {
             flex: 1;
-            min-height: 0; /* Importante para flexbox */
+            min-height: 0;
             position: relative;
+            background: #000;
         }
+        canvas { touch-action: none; }
     </style>
 </head>
-<body class="bg-slate-950 text-slate-100 font-sans">
+<body class="text-slate-100 font-sans">
 
     <div class="app-container">
-        <!-- Encabezado Fino -->
+        <!-- Encabezado -->
         <header class="p-3 border-b border-slate-800 flex justify-between items-center bg-slate-900 shrink-0">
             <div class="flex items-center gap-2">
                 <div class="bg-emerald-500 p-1.5 rounded-lg text-white">
@@ -56,12 +53,17 @@
             <div id="page-counter" class="text-xs font-mono bg-slate-800 px-3 py-1 rounded-full border border-slate-700">0 PÁGS</div>
         </header>
 
-        <!-- Área Principal de Visor -->
-        <main id="video-container" class="bg-black flex items-center justify-center overflow-hidden">
+        <!-- Visor de Cámara -->
+        <main id="video-container" class="flex items-center justify-center cursor-pointer">
             <div id="scan-line" class="scan-line"></div>
             <video id="video" autoplay playsinline class="w-full h-full object-contain"></video>
             
-            <!-- Capa de Edición de Perspectiva -->
+            <!-- Mensaje de instrucción -->
+            <div id="tap-hint" class="hidden absolute bottom-10 left-1/2 -translate-x-1/2 bg-black/50 px-4 py-2 rounded-full text-xs font-bold animate-pulse">
+                TOCA LA PANTALLA PARA CAPTURAR
+            </div>
+
+            <!-- Editor de Perspectiva -->
             <div id="edit-layer" class="hidden absolute inset-0 bg-black flex items-center justify-center">
                 <div id="canvas-wrapper" class="relative inline-block max-w-full max-h-full">
                     <canvas id="edit-canvas" class="max-w-full max-h-full block"></canvas>
@@ -72,55 +74,56 @@
                 </div>
             </div>
 
-            <div id="placeholder" class="absolute inset-0 flex flex-col items-center justify-center text-slate-500 gap-4 bg-slate-900">
-                <p>Presiona Activar para iniciar</p>
+            <div id="placeholder" class="absolute inset-0 flex flex-col items-center justify-center text-slate-500 bg-slate-900">
+                <p>Presiona el botón de abajo para activar</p>
             </div>
         </main>
 
-        <!-- Barra de Controles Inferior (Siempre visible) -->
-        <footer class="bg-slate-900 border-t border-slate-800 p-4 shrink-0">
-            <div class="max-w-md mx-auto flex flex-col gap-4">
+        <!-- Controles Inferiores -->
+        <footer class="bg-slate-900 border-t border-slate-800 p-4 shrink-0 shadow-2xl">
+            <div class="max-w-md mx-auto flex flex-col gap-3">
                 
-                <!-- Botones de Acción -->
-                <div id="camera-controls" class="flex justify-center">
-                    <button id="start-btn" class="bg-white text-slate-900 px-8 py-3 rounded-xl font-bold shadow-xl w-full">Activar Cámara</button>
-                    <button id="capture-btn" class="hidden bg-emerald-500 text-white px-8 py-3 rounded-xl font-bold shadow-lg w-full">Escanear Documento</button>
+                <div id="camera-controls">
+                    <button id="start-btn" class="bg-white text-slate-900 px-8 py-3 rounded-xl font-bold w-full active:scale-95 transition-transform">Activar Cámara</button>
+                    <!-- El botón de captura sigue existiendo pero es secundario al toque -->
+                    <button id="capture-btn" class="hidden bg-emerald-600 text-white px-8 py-3 rounded-xl font-bold w-full active:scale-95 transition-transform">Tomar Foto</button>
                 </div>
 
                 <div id="edit-controls" class="hidden grid grid-cols-2 gap-3">
-                    <button id="confirm-warp-btn" class="bg-emerald-500 text-white py-3 rounded-xl font-bold">Aplanar</button>
+                    <button id="confirm-warp-btn" class="bg-emerald-500 text-white py-3 rounded-xl font-bold">Aplanar Página</button>
                     <button id="cancel-edit-btn" class="bg-slate-700 text-white py-3 rounded-xl font-bold">Descartar</button>
                 </div>
 
-                <!-- Opciones secundarias -->
-                <div class="flex items-center justify-between gap-4">
+                <div class="flex items-center justify-between pt-2">
                     <div class="flex items-center gap-2">
-                        <input type="checkbox" id="filter-bw" class="w-5 h-5 accent-emerald-500">
-                        <label for="filter-bw" class="text-xs font-bold text-slate-400">Modo B&N</label>
+                        <input type="checkbox" id="filter-bw" class="w-5 h-5 accent-emerald-500" checked>
+                        <label for="filter-bw" class="text-xs font-bold text-slate-400">Blanco y Negro</label>
                     </div>
                     <div class="flex gap-2">
-                        <button id="reset-btn" class="text-[10px] font-bold text-rose-500 uppercase px-2 py-1">Limpiar</button>
-                        <button id="generate-btn" disabled class="bg-slate-800 text-slate-500 px-4 py-2 rounded-lg text-xs font-bold transition-colors">Guardar PDF</button>
+                        <button id="reset-btn" class="text-[10px] font-bold text-rose-500 uppercase px-2">Limpiar</button>
+                        <button id="generate-btn" disabled class="bg-slate-800 text-slate-500 px-4 py-2 rounded-lg text-xs font-bold">Guardar PDF</button>
                     </div>
                 </div>
             </div>
         </footer>
     </div>
 
-    <!-- Miniaturas (Flotantes para ahorrar espacio) -->
-    <div id="thumbnail-drawer" class="fixed bottom-32 right-4 flex flex-col gap-2 max-h-40 overflow-y-auto pointer-events-none">
+    <!-- Miniaturas -->
+    <div id="thumbnail-drawer" class="fixed bottom-36 right-4 flex flex-col-reverse gap-2 pointer-events-none">
         <div id="thumbnail-grid" class="flex flex-col-reverse gap-2 pointer-events-auto"></div>
     </div>
 
     <script>
         const { jsPDF } = window.jspdf;
         const video = document.getElementById('video');
+        const videoContainer = document.getElementById('video-container');
         const editLayer = document.getElementById('edit-layer');
         const editCanvas = document.getElementById('edit-canvas');
         const handlesContainer = document.getElementById('handles-container');
         const polyGuide = document.getElementById('poly-guide');
         const startBtn = document.getElementById('start-btn');
         const captureBtn = document.getElementById('capture-btn');
+        const tapHint = document.getElementById('tap-hint');
         const confirmWarpBtn = document.getElementById('confirm-warp-btn');
         const cancelEditBtn = document.getElementById('cancel-edit-btn');
         const generateBtn = document.getElementById('generate-btn');
@@ -130,10 +133,10 @@
         let stream = null;
         let capturedImage = null;
         let corners = []; 
+        let isEditing = false;
 
         async function startCamera() {
             try {
-                // Intentar máxima resolución pero asegurar que quepa en memoria
                 stream = await navigator.mediaDevices.getUserMedia({ 
                     video: { facingMode: "environment", width: { ideal: 1920 }, height: { ideal: 1080 } } 
                 });
@@ -141,21 +144,36 @@
                 document.getElementById('placeholder').classList.add('hidden');
                 startBtn.classList.add('hidden');
                 captureBtn.classList.remove('hidden');
+                tapHint.classList.remove('hidden');
                 document.getElementById('scan-line').style.display = 'block';
             } catch (err) { alert("Error: Revisa los permisos de la cámara."); }
         }
 
+        // Función principal de captura
         function captureToEdit() {
+            if (isEditing || !stream) return; // Evitar capturas múltiples en el editor
+
             const tempCanvas = document.createElement('canvas');
             tempCanvas.width = video.videoWidth;
             tempCanvas.height = video.videoHeight;
             tempCanvas.getContext('2d').drawImage(video, 0, 0);
             capturedImage = tempCanvas;
+            
+            isEditing = true;
             showEditor();
         }
 
+        // EVENTO: Capturar al tocar el contenedor del video
+        videoContainer.addEventListener('click', (e) => {
+            // Solo capturar si NO estamos editando y el clic fue en el video o el hint
+            if (!isEditing && (e.target === video || e.target === videoContainer || e.target === tapHint)) {
+                captureToEdit();
+            }
+        });
+
         function showEditor() {
             editLayer.classList.remove('hidden');
+            tapHint.classList.add('hidden');
             document.getElementById('camera-controls').classList.add('hidden');
             document.getElementById('edit-controls').classList.remove('hidden');
 
@@ -165,7 +183,6 @@
 
             const w = editCanvas.width;
             const h = editCanvas.height;
-            // Puntos iniciales
             corners = [
                 { x: w*0.1, y: h*0.1 }, { x: w*0.9, y: h*0.1 },
                 { x: w*0.9, y: h*0.9 }, { x: w*0.1, y: h*0.9 }
@@ -186,7 +203,6 @@
                 handle.className = 'corner-handle';
                 handle.style.left = `${c.x * scaleX}px`;
                 handle.style.top = `${c.y * scaleY}px`;
-                handle.style.pointerEvents = "auto";
                 
                 polyPoints += `${c.x * scaleX},${c.y * scaleY} `;
 
@@ -197,17 +213,20 @@
                     renderUI();
                 };
 
-                // Soporte Ratón
-                handle.onmousedown = (e) => {
-                    document.onmousemove = (me) => updatePos(me.clientX, me.clientY);
-                    document.onmouseup = () => document.onmousemove = null;
+                // Soporte Ratón y Touch para los puntos verdes
+                const onMove = (e) => {
+                    const moveEvent = e.touches ? e.touches[0] : e;
+                    updatePos(moveEvent.clientX, moveEvent.clientY);
+                    e.preventDefault();
                 };
 
-                // Soporte Táctil
-                handle.ontouchmove = (e) => {
-                    const touch = e.touches[0];
-                    updatePos(touch.clientX, touch.clientY);
-                    e.preventDefault();
+                handle.onmousedown = handle.ontouchstart = (e) => {
+                    window.addEventListener('mousemove', onMove);
+                    window.addEventListener('touchmove', onMove, { passive: false });
+                    window.onmouseup = window.ontouchend = () => {
+                        window.removeEventListener('mousemove', onMove);
+                        window.removeEventListener('touchmove', onMove);
+                    };
                 };
 
                 handlesContainer.appendChild(handle);
@@ -216,15 +235,13 @@
         }
 
         function warpAndAdd() {
-            // Tamaño de salida profesional (A4 proporciones)
             const outW = 1000; 
-            const outH = 1400; 
+            const outH = 1414; // Proporción A4
             const procCanvas = document.createElement('canvas');
             procCanvas.width = outW;
             procCanvas.height = outH;
             const ctx = procCanvas.getContext('2d');
 
-            // Recorte simple (Simulación de warp para rapidez en navegador)
             ctx.drawImage(capturedImage, 
                 corners[0].x, corners[0].y, 
                 corners[1].x - corners[0].x, corners[3].y - corners[0].y, 
@@ -248,24 +265,25 @@
         }
 
         function closeEditor() {
+            isEditing = false;
             editLayer.classList.add('hidden');
+            tapHint.classList.remove('hidden');
             document.getElementById('camera-controls').classList.remove('hidden');
             document.getElementById('edit-controls').classList.add('hidden');
         }
 
         function updateThumbnails() {
             thumbnailGrid.innerHTML = '';
-            pages.forEach((p, i) => {
+            pages.forEach((p) => {
                 const img = document.createElement('img');
                 img.src = p.data;
-                img.className = "w-12 h-16 object-cover rounded border-2 border-emerald-500 shadow-lg";
+                img.className = "w-12 h-16 object-cover rounded border-2 border-emerald-500 shadow-xl bg-white";
                 thumbnailGrid.appendChild(img);
             });
             document.getElementById('page-counter').innerText = `${pages.length} PÁGS`;
             generateBtn.disabled = pages.length === 0;
             if (pages.length > 0) {
-                generateBtn.classList.replace('bg-slate-800', 'bg-blue-600');
-                generateBtn.classList.replace('text-slate-500', 'text-white');
+                generateBtn.className = "bg-blue-600 text-white px-4 py-2 rounded-lg text-xs font-bold shadow-lg";
             }
         }
 
@@ -275,16 +293,17 @@
         cancelEditBtn.onclick = closeEditor;
         
         generateBtn.onclick = () => {
+            const name = document.getElementById('filename')?.value || "Escaneo";
             const doc = new jsPDF('p', 'px', [pages[0].w, pages[0].h]);
             pages.forEach((p, i) => {
                 if (i > 0) doc.addPage([p.w, p.h], 'p');
                 doc.addImage(p.data, 'JPEG', 0, 0, p.w, p.h);
             });
-            doc.save(`${document.getElementById('filename').value}.pdf`);
+            doc.save(`${name}.pdf`);
         };
 
-        document.getElementById('reset-btn').onclick = () => { if(confirm("¿Borrar todo?")) { pages = []; updateThumbnails(); }};
-        window.onresize = () => { if(!editLayer.classList.contains('hidden')) renderUI(); };
+        document.getElementById('reset-btn').onclick = () => { if(confirm("¿Borrar todo Jorge?")) { pages = []; updateThumbnails(); }};
+        window.onresize = () => { if(isEditing) renderUI(); };
     </script>
 </body>
 </html>
