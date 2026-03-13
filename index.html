@@ -15,6 +15,8 @@
             display: flex;
             flex-direction: column;
             touch-action: none;
+            -webkit-user-select: none;
+            user-select: none;
         }
         .app-header {
             height: 55px;
@@ -44,41 +46,37 @@
             z-index: 1000;
         }
         .corner-handle { 
-            width: 42px; height: 42px; 
-            background: rgba(16, 185, 129, 0.9); 
-            border: 3px solid white; 
+            width: 46px; height: 46px; 
+            background: rgba(16, 185, 129, 0.95); 
+            border: 4px solid white; 
             border-radius: 50%; 
             position: absolute; 
             pointer-events: auto;
             transform: translate(-50%, -50%); 
-            box-shadow: 0 0 15px rgba(0,0,0,0.6);
+            box-shadow: 0 0 20px rgba(0,0,0,0.7);
             z-index: 200; 
             touch-action: none;
         }
+        /* El contenedor del canvas ahora tiene margen interno para que los puntos no se salgan */
         #canvas-wrapper {
             position: relative;
             display: inline-block;
-            max-width: 90%;
-            max-height: 80%;
-            border: 2px solid #10b981;
+            margin: 20px;
+            border: 2px solid #334155;
+            background: #111;
         }
         #edit-canvas {
-            max-width: 100%;
-            max-height: 100%;
+            max-width: 80vw;
+            max-height: 60vh;
             display: block;
+            object-fit: contain;
         }
-        #status-msg {
-            position: absolute;
-            top: 10px;
-            left: 50%;
-            transform: translateX(-50%);
-            background: rgba(0,0,0,0.7);
-            padding: 4px 12px;
-            border-radius: 20px;
-            font-size: 10px;
-            color: #10b981;
-            z-index: 60;
-            white-space: nowrap;
+        .flash-success {
+            animation: flashGreen 0.4s ease-out;
+        }
+        @keyframes flashGreen {
+            0% { background: rgba(16, 185, 129, 0.6); }
+            100% { background: transparent; }
         }
     </style>
 </head>
@@ -86,7 +84,7 @@
 
     <header class="app-header">
         <div class="flex items-center gap-2">
-            <div class="bg-emerald-500 p-1 rounded-lg text-white">
+            <div class="bg-emerald-500 p-1.5 rounded-lg text-white">
                 <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                 </svg>
@@ -97,12 +95,10 @@
     </header>
 
     <main class="main-content" id="video-container">
-        <div id="status-msg" class="hidden">INICIANDO CÁMARA...</div>
-        
         <video id="video" autoplay playsinline muted class="w-full h-full object-contain"></video>
         
         <!-- Capa de Edición -->
-        <div id="edit-layer" class="hidden absolute inset-0 bg-black/95 flex items-center justify-center p-4 z-40">
+        <div id="edit-layer" class="hidden absolute inset-0 bg-black/95 flex items-center justify-center z-40">
             <div id="canvas-wrapper">
                 <canvas id="edit-canvas"></canvas>
                 <div id="handles-container" class="absolute inset-0 pointer-events-none">
@@ -118,11 +114,11 @@
         </div>
 
         <div id="tap-hint" class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-black/60 px-6 py-3 rounded-2xl text-xs font-bold animate-pulse text-center text-white pointer-events-none z-10 hidden">
-            TOCA EL CENTRO PARA ESCANEAR
+            TOCA EL CENTRO PARA CAPTURAR
         </div>
 
-        <div id="placeholder" class="absolute inset-0 flex items-center justify-center text-slate-500 bg-slate-900 z-0">
-            <p>Jorge, presiona Activar para comenzar</p>
+        <div id="placeholder" class="absolute inset-0 flex items-center justify-center text-slate-500 bg-slate-900 z-0 text-center p-6">
+            <p>Jorge, presiona Activar Cámara.<br><small class="opacity-50">(Requiere HTTPS o Localhost)</small></p>
         </div>
     </main>
 
@@ -133,10 +129,12 @@
                 <button id="start-btn" type="button" class="bg-white text-slate-900 px-8 py-3 rounded-xl font-bold w-full shadow-lg active:scale-95 transition-transform">Activar Cámara</button>
             </div>
 
-            <div id="edit-controls" class="hidden grid grid-cols-2 gap-3">
-                <button id="auto-detect-btn" type="button" class="bg-blue-600 text-white py-3 rounded-xl font-bold text-sm shadow-md active:scale-95">Auto-Ajuste</button>
-                <button id="confirm-warp-btn" type="button" class="bg-emerald-500 text-white py-3 rounded-xl font-bold text-sm shadow-md active:scale-95">Aplanar Página</button>
-                <button id="cancel-edit-btn" type="button" class="col-span-2 bg-slate-800 text-slate-400 py-2 rounded-lg text-xs font-bold uppercase tracking-widest">Descartar</button>
+            <div id="edit-controls" class="hidden flex flex-col gap-3">
+                <div class="grid grid-cols-2 gap-3">
+                    <button id="auto-detect-btn" type="button" class="bg-blue-600 text-white py-3 rounded-xl font-bold text-sm shadow-md active:scale-95">Auto-Ajuste</button>
+                    <button id="confirm-warp-btn" type="button" class="bg-emerald-500 text-white py-3 rounded-xl font-bold text-sm shadow-md active:scale-95">Aplanar Página</button>
+                </div>
+                <button id="cancel-edit-btn" type="button" class="bg-slate-800 text-slate-400 py-2 rounded-lg text-xs font-bold uppercase tracking-widest">Descartar Toma</button>
             </div>
 
             <div class="flex items-center justify-between border-t border-slate-800 pt-3">
@@ -146,7 +144,7 @@
                 </div>
                 <div class="flex gap-2">
                     <button id="reset-btn" type="button" class="text-[10px] font-bold text-rose-500 uppercase px-2 py-2">Limpiar</button>
-                    <button id="generate-btn" type="button" disabled class="bg-slate-700 text-slate-500 px-4 py-2 rounded-lg text-xs font-bold transition-all shadow-sm">Bajar PDF</button>
+                    <button id="generate-btn" type="button" disabled class="bg-slate-700 text-slate-500 px-4 py-2 rounded-lg text-xs font-bold shadow-sm">Bajar PDF</button>
                 </div>
             </div>
         </div>
@@ -161,7 +159,7 @@
         const polyGuide = document.getElementById('poly-guide');
         const startBtn = document.getElementById('start-btn');
         const tapHint = document.getElementById('tap-hint');
-        const statusMsg = document.getElementById('status-msg');
+        const autoDetectBtn = document.getElementById('auto-detect-btn');
         const confirmWarpBtn = document.getElementById('confirm-warp-btn');
         const cancelEditBtn = document.getElementById('cancel-edit-btn');
         const generateBtn = document.getElementById('generate-btn');
@@ -172,11 +170,7 @@
         let corners = []; 
         let isEditing = false;
 
-        // FUNCIÓN MEJORADA: Intenta alta resolución, si falla, intenta resolución básica
         async function startCamera() {
-            statusMsg.classList.remove('hidden');
-            statusMsg.innerText = "ACCEDIENDO A ÓPTICA...";
-            
             const constraints = [
                 { video: { facingMode: "environment", width: { ideal: 1920 }, height: { ideal: 1080 } } },
                 { video: { facingMode: "environment" } },
@@ -187,21 +181,13 @@
                 try {
                     stream = await navigator.mediaDevices.getUserMedia(constraint);
                     video.srcObject = stream;
-                    await video.play(); // Forzar el play del video
-                    
                     document.getElementById('placeholder').classList.add('hidden');
                     startBtn.parentElement.classList.add('hidden');
                     tapHint.classList.remove('hidden');
-                    statusMsg.innerText = "CÁMARA CONECTADA";
-                    setTimeout(() => statusMsg.classList.add('hidden'), 2000);
                     return;
-                } catch (err) {
-                    console.log("Reintentando con otra configuración...");
-                }
+                } catch (e) { console.log("Reintento..."); }
             }
-            
-            alert("Jorge, no pudimos abrir la cámara. Revisa si el navegador tiene permiso.");
-            statusMsg.innerText = "ERROR DE CÁMARA";
+            alert("Jorge, la cámara no abrió. Asegúrate de estar en una conexión segura (HTTPS).");
         }
 
         function captureToEdit() {
@@ -217,12 +203,8 @@
             showEditor();
         }
 
-        // Listener de toque corregido para Jorge
-        videoContainer.addEventListener('mousedown', (e) => {
-            if (!isEditing && e.target === video) captureToEdit();
-        });
-        
-        videoContainer.addEventListener('touchstart', (e) => {
+        // Listener de toque en pantalla principal
+        videoContainer.addEventListener('click', (e) => {
             if (!isEditing && e.target === video) captureToEdit();
         });
 
@@ -237,7 +219,8 @@
 
             const w = editCanvas.width;
             const h = editCanvas.height;
-            corners = [{x: w*0.1, y: h*0.1}, {x: w*0.9, y: h*0.1}, {x: w*0.9, y: h*0.9}, {x: w*0.1, y: h*0.9}];
+            // Puntos iniciales centrados
+            corners = [{x: w*0.15, y: h*0.15}, {x: w*0.85, y: h*0.15}, {x: w*0.85, y: h*0.85}, {x: w*0.15, y: h*0.85}];
             
             setupHandles();
             updateUI();
@@ -256,8 +239,12 @@
                         const scaleX = rect.width / editCanvas.width;
                         const scaleY = rect.height / editCanvas.height;
                         
-                        corners[i].x = Math.max(0, Math.min(editCanvas.width, (pe.clientX - rect.left) / scaleX));
-                        corners[i].y = Math.max(0, Math.min(editCanvas.height, (pe.clientY - rect.top) / scaleY));
+                        // Limitamos el movimiento dentro del canvas para Jorge
+                        let nx = (pe.clientX - rect.left) / scaleX;
+                        let ny = (pe.clientY - rect.top) / scaleY;
+                        
+                        corners[i].x = Math.max(0, Math.min(editCanvas.width, nx));
+                        corners[i].y = Math.max(0, Math.min(editCanvas.height, ny));
                         updateUI();
                     };
 
@@ -285,44 +272,83 @@
             polyGuide.setAttribute('points', polyPoints);
         }
 
+        // Lógica de detección automática real
+        autoDetectBtn.onclick = (e) => {
+            e.stopPropagation();
+            const ctx = editCanvas.getContext('2d');
+            const data = ctx.getImageData(0, 0, editCanvas.width, editCanvas.height).data;
+            const w = editCanvas.width;
+            const h = editCanvas.height;
+            
+            let minX = w, maxX = 0, minY = h, maxY = 0;
+            let found = false;
+
+            // Buscamos pixeles con brillo de "papel"
+            for (let y = 0; y < h; y += 20) {
+                for (let x = 0; x < w; x += 20) {
+                    const i = (y * w + x) * 4;
+                    const brightness = (data[i] + data[i+1] + data[i+2]) / 3;
+                    if (brightness > 140) {
+                        if (x < minX) minX = x; if (x > maxX) maxX = x;
+                        if (y < minY) minY = y; if (y > maxY) maxY = y;
+                        found = true;
+                    }
+                }
+            }
+            if (found) {
+                corners = [{x:minX, y:minY}, {x:maxX, y:minY}, {x:maxX, y:maxY}, {x:minX, y:maxY}];
+                updateUI();
+            }
+        };
+
         function warpAndAdd(e) {
-            if(e) { e.preventDefault(); e.stopPropagation(); }
+            e.stopPropagation();
             
             const minX = Math.min(...corners.map(c => c.x));
             const maxX = Math.max(...corners.map(c => c.x));
             const minY = Math.min(...corners.map(c => c.y));
             const maxY = Math.max(...corners.map(c => c.y));
             
-            const srcW = maxX - minX;
-            const srcH = maxY - minY;
+            const sw = maxX - minX;
+            const sh = maxY - minY;
 
-            if (srcW < 30 || srcH < 30) return;
+            if (sw < 50 || sh < 50) return;
 
             const outW = 1000; const outH = 1400; 
-            const procCanvas = document.createElement('canvas');
-            procCanvas.width = outW; procCanvas.height = outH;
-            const ctx = procCanvas.getContext('2d');
+            const canvas = document.createElement('canvas');
+            canvas.width = outW; canvas.height = outH;
+            const ctx = canvas.getContext('2d');
 
-            ctx.drawImage(capturedImage, minX, minY, srcW, srcH, 0, 0, outW, outH);
+            // MEJORA: Filtro de contraste para texto nítido
+            ctx.filter = "contrast(140%) brightness(105%)";
+            ctx.drawImage(capturedImage, minX, minY, sw, sh, 0, 0, outW, outH);
+            ctx.filter = "none";
 
             if (document.getElementById('filter-bw').checked) {
                 const img = ctx.getImageData(0, 0, outW, outH);
                 const d = img.data;
                 for (let i=0; i<d.length; i+=4) {
                     const g = d[i]*0.3 + d[i+1]*0.59 + d[i+2]*0.11;
-                    d[i] = d[i+1] = d[i+2] = g > 130 ? 255 : (g < 75 ? 0 : g);
+                    const val = g > 130 ? 255 : (g < 75 ? 0 : g);
+                    d[i] = d[i+1] = d[i+2] = val;
                 }
                 ctx.putImageData(img, 0, 0);
             }
 
-            pages.push({ data: procCanvas.toDataURL('image/jpeg', 0.85), w: outW, h: outH });
+            pages.push({ data: canvas.toDataURL('image/jpeg', 0.65), w: outW, h: outH });
             
+            videoContainer.classList.add('flash-success');
+            setTimeout(() => videoContainer.classList.remove('flash-success'), 400);
+
+            closeEditor();
+            updateStats();
+        }
+
+        function closeEditor() {
             isEditing = false;
             editLayer.classList.add('hidden');
             tapHint.classList.remove('hidden');
             document.getElementById('edit-controls').classList.add('hidden');
-            
-            updateStats();
         }
 
         function updateStats() {
@@ -336,20 +362,19 @@
 
         startBtn.onclick = startCamera;
         confirmWarpBtn.onclick = warpAndAdd;
-        cancelEditBtn.onclick = (e) => { e.stopPropagation(); isEditing = false; editLayer.classList.add('hidden'); tapHint.classList.remove('hidden'); document.getElementById('edit-controls').classList.add('hidden'); };
+        cancelEditBtn.onclick = (e) => { e.stopPropagation(); closeEditor(); };
         
         generateBtn.onclick = (e) => {
             e.stopPropagation();
             const doc = new jsPDF('p', 'px', [pages[0].w, pages[0].h]);
             pages.forEach((p, i) => {
                 if (i > 0) doc.addPage([p.w, p.h], 'p');
-                doc.addImage(p.data, 'JPEG', 0, 0, p.w, p.h);
+                doc.addImage(p.data, 'JPEG', 0, 0, p.w, p.h, null, 'FAST');
             });
             doc.save(`Scan_Jorge_${Date.now()}.pdf`);
         };
 
         document.getElementById('reset-btn').onclick = () => { if(confirm("¿Borrar todo?")) location.reload(); };
-        window.onresize = () => { if(isEditing) updateUI(); };
     </script>
 </body>
 </html>
