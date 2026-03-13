@@ -1,0 +1,257 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DocScan Pro - Jorge</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <style>
+        .glass {
+            background: rgba(255, 255, 255, 0.05);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        .scan-line {
+            height: 2px;
+            background: #10b981;
+            position: absolute;
+            width: 100%;
+            z-index: 10;
+            top: 0;
+            animation: scan 3s linear infinite;
+            display: none;
+        }
+        @keyframes scan {
+            0% { top: 0; }
+            100% { top: 100%; }
+        }
+        #video-container video {
+            transform: scaleX(1); /* No mirror for documents */
+        }
+    </style>
+</head>
+<body class="bg-slate-950 text-slate-100 min-h-screen flex flex-col font-sans">
+
+    <!-- Header -->
+    <header class="p-4 border-b border-slate-800 flex justify-between items-center bg-slate-900">
+        <div class="flex items-center gap-2">
+            <div class="bg-emerald-500 p-2 rounded-lg">
+                <svg xmlns="http://www.w3.org/2000/svg" class="w-6 h-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                </svg>
+            </div>
+            <h1 class="text-xl font-bold tracking-tight">DocScan <span class="text-emerald-500">Pro</span></h1>
+        </div>
+        <div id="page-counter" class="text-sm font-mono bg-slate-800 px-3 py-1 rounded-full text-slate-400">
+            Páginas: 0
+        </div>
+    </header>
+
+    <main class="flex-1 flex flex-col md:flex-row gap-4 p-4 max-w-7xl mx-auto w-full">
+        
+        <!-- Visor de Cámara -->
+        <div class="flex-1 flex flex-col gap-4">
+            <div id="video-container" class="relative bg-black rounded-3xl overflow-hidden shadow-2xl aspect-[3/4] md:aspect-auto md:h-[60vh] flex items-center justify-center border-4 border-slate-800">
+                <div id="scan-line" class="scan-line"></div>
+                <video id="video" autoplay playsinline class="w-full h-full object-contain"></video>
+                
+                <div id="placeholder" class="absolute inset-0 flex flex-col items-center justify-center text-slate-500 gap-4">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="w-16 h-16 opacity-20" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
+                    </svg>
+                    <p>La cámara está apagada</p>
+                </div>
+            </div>
+
+            <!-- Controles Principales -->
+            <div class="flex justify-center gap-4 py-2">
+                <button id="start-btn" class="bg-white text-slate-900 px-8 py-4 rounded-2xl font-bold hover:bg-slate-200 transition-all flex items-center gap-2">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" viewBox="0 0 20 20" fill="currentColor">
+                        <path fill-rule="evenodd" d="M11.3 1.046A1 1 0 0112 2v5h4a1 1 0 01.82 1.573l-7 10A1 1 0 018 18v-5H4a1 1 0 01-.82-1.573l7-10a1 1 0 011.12-.38z" clip-rule="evenodd" />
+                    </svg>
+                    Activar Cámara
+                </button>
+                
+                <button id="capture-btn" class="hidden bg-emerald-500 text-white px-8 py-4 rounded-2xl font-bold hover:bg-emerald-400 transition-all flex items-center gap-2 shadow-lg shadow-emerald-500/20">
+                    <div class="w-4 h-4 bg-white rounded-full"></div>
+                    Capturar Página
+                </button>
+            </div>
+        </div>
+
+        <!-- Panel Lateral: Miniaturas y Configuración -->
+        <div class="w-full md:w-80 flex flex-col gap-4">
+            <div class="glass rounded-3xl p-6 flex flex-col gap-6">
+                <div>
+                    <label class="text-xs font-bold text-slate-500 uppercase tracking-widest mb-2 block">Nombre del Documento</label>
+                    <input type="text" id="filename" value="Mi_Escaneo" class="w-full bg-slate-800 border-none rounded-xl px-4 py-3 text-white focus:ring-2 focus:ring-emerald-500 transition-all">
+                </div>
+
+                <div>
+                    <label class="text-xs font-bold text-slate-500 uppercase tracking-widest mb-2 block">Páginas Capturadas</label>
+                    <div id="thumbnail-grid" class="grid grid-cols-2 gap-2 max-h-60 overflow-y-auto pr-2 custom-scrollbar">
+                        <!-- Miniaturas aquí -->
+                    </div>
+                </div>
+
+                <button id="generate-btn" disabled class="w-full bg-slate-800 text-slate-500 py-4 rounded-2xl font-bold transition-all flex items-center justify-center gap-2 cursor-not-allowed">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                    </svg>
+                    Finalizar y Descargar
+                </button>
+
+                <button id="reset-btn" class="text-xs text-rose-400 hover:text-rose-300 transition-colors underline">Borrar todo y empezar de nuevo</button>
+            </div>
+            
+            <div id="status-bar" class="text-center text-xs text-slate-500 font-medium">
+                Listo para escanear
+            </div>
+        </div>
+    </main>
+
+    <canvas id="canvas" class="hidden"></canvas>
+
+    <script>
+        const { jsPDF } = window.jspdf;
+        const video = document.getElementById('video');
+        const canvas = document.getElementById('canvas');
+        const startBtn = document.getElementById('start-btn');
+        const captureBtn = document.getElementById('capture-btn');
+        const generateBtn = document.getElementById('generate-btn');
+        const resetBtn = document.getElementById('reset-btn');
+        const thumbnailGrid = document.getElementById('thumbnail-grid');
+        const pageCounter = document.getElementById('page-counter');
+        const status = document.getElementById('status-bar');
+        const scanLine = document.getElementById('scan-line');
+        const placeholder = document.getElementById('placeholder');
+
+        let pages = [];
+        let stream = null;
+
+        // Iniciar cámara con alta calidad
+        async function startCamera() {
+            try {
+                status.innerText = "Solicitando cámara...";
+                stream = await navigator.mediaDevices.getUserMedia({ 
+                    video: { 
+                        facingMode: "environment",
+                        width: { ideal: 1920 },
+                        height: { ideal: 1080 }
+                    }, 
+                    audio: false 
+                });
+                video.srcObject = stream;
+                
+                placeholder.classList.add('hidden');
+                startBtn.classList.add('hidden');
+                captureBtn.classList.remove('hidden');
+                scanLine.style.display = 'block';
+                status.innerText = "Cámara activa";
+            } catch (err) {
+                status.innerText = "Error: No se pudo acceder a la cámara.";
+                console.error(err);
+            }
+        }
+
+        // Capturar una página
+        function capturePage() {
+            if (!stream) return;
+
+            // Efecto de flash visual
+            video.classList.add('brightness-200');
+            setTimeout(() => video.classList.remove('brightness-200'), 100);
+
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
+            const ctx = canvas.getContext('2d');
+            ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+            
+            const imgData = canvas.toDataURL('image/jpeg', 0.85);
+            pages.push({
+                data: imgData,
+                width: canvas.width,
+                height: canvas.height
+            });
+
+            updateUI();
+            status.innerText = `Página ${pages.length} capturada`;
+        }
+
+        // Actualizar interfaz
+        function updateUI() {
+            thumbnailGrid.innerHTML = '';
+            pages.forEach((page, index) => {
+                const div = document.createElement('div');
+                div.className = "relative group aspect-[3/4] bg-slate-900 rounded-lg overflow-hidden border border-slate-700";
+                div.innerHTML = `
+                    <img src="${page.data}" class="w-full h-full object-cover">
+                    <div class="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                        <span class="text-white font-bold text-lg">${index + 1}</span>
+                    </div>
+                `;
+                thumbnailGrid.appendChild(div);
+            });
+
+            pageCounter.innerText = `Páginas: ${pages.length}`;
+            
+            if (pages.length > 0) {
+                generateBtn.disabled = false;
+                generateBtn.classList.replace('bg-slate-800', 'bg-emerald-600');
+                generateBtn.classList.replace('text-slate-500', 'text-white');
+                generateBtn.classList.remove('cursor-not-allowed');
+            }
+        }
+
+        // Generar el PDF final
+        async function generatePDF() {
+            if (pages.length === 0) return;
+
+            status.innerText = "Generando PDF profesional...";
+            generateBtn.innerText = "Procesando...";
+            generateBtn.disabled = true;
+
+            const name = document.getElementById('filename').value || 'documento';
+            
+            // Primera página
+            const first = pages[0];
+            const orientation = first.width > first.height ? 'l' : 'p';
+            const pdf = new jsPDF(orientation, 'px', [first.width, first.height]);
+            
+            // Añadir todas las páginas
+            for (let i = 0; i < pages.length; i++) {
+                const p = pages[i];
+                if (i > 0) {
+                    const orient = p.width > p.height ? 'l' : 'p';
+                    pdf.addPage([p.width, p.height], orient);
+                }
+                pdf.addImage(p.data, 'JPEG', 0, 0, p.width, p.height, null, 'FAST');
+            }
+
+            pdf.save(`${name}.pdf`);
+            
+            status.innerText = "¡PDF guardado con éxito!";
+            generateBtn.innerText = "Finalizar y Descargar";
+            generateBtn.disabled = false;
+        }
+
+        // Reiniciar aplicación
+        function resetApp() {
+            if (pages.length > 0 && !confirm("¿Estás seguro de que quieres borrar todas las páginas capturadas?")) return;
+            pages = [];
+            updateUI();
+            generateBtn.disabled = true;
+            generateBtn.classList.replace('bg-emerald-600', 'bg-slate-800');
+            generateBtn.classList.replace('text-white', 'text-slate-500');
+            generateBtn.classList.add('cursor-not-allowed');
+            status.innerText = "Aplicación reiniciada";
+        }
+
+        startBtn.addEventListener('click', startCamera);
+        captureBtn.addEventListener('click', capturePage);
+        generateBtn.addEventListener('click', generatePDF);
+        resetBtn.addEventListener('click', resetApp);
+    </script>
+</body>
+</html>
