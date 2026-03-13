@@ -1,380 +1,375 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>DocScan Pro - Jorge</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-    <style>
-        body, html {
-            height: 100%;
-            margin: 0;
-            overflow: hidden;
-            background-color: #020617;
-            display: flex;
-            flex-direction: column;
-            touch-action: none;
-            -webkit-user-select: none;
-            user-select: none;
-        }
-        .app-header {
-            height: 55px;
-            background: #0f172a;
-            border-bottom: 1px solid #1e293b;
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            padding: 0 15px;
-            flex-shrink: 0;
-            z-index: 100;
-        }
-        .main-content {
-            flex: 1;
-            position: relative;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            overflow: hidden;
-            background: #000;
-        }
-        .app-footer {
-            background: #0f172a;
-            border-top: 1px solid #1e293b;
-            padding: 10px 15px 20px 15px;
-            flex-shrink: 0;
-            z-index: 1000;
-        }
-        .corner-handle { 
-            width: 46px; height: 46px; 
-            background: rgba(16, 185, 129, 0.95); 
-            border: 4px solid white; 
-            border-radius: 50%; 
-            position: absolute; 
-            pointer-events: auto;
-            transform: translate(-50%, -50%); 
-            box-shadow: 0 0 20px rgba(0,0,0,0.7);
-            z-index: 200; 
-            touch-action: none;
-        }
-        /* El contenedor del canvas ahora tiene margen interno para que los puntos no se salgan */
-        #canvas-wrapper {
-            position: relative;
-            display: inline-block;
-            margin: 20px;
-            border: 2px solid #334155;
-            background: #111;
-        }
-        #edit-canvas {
-            max-width: 80vw;
-            max-height: 60vh;
-            display: block;
-            object-fit: contain;
-        }
-        .flash-success {
-            animation: flashGreen 0.4s ease-out;
-        }
-        @keyframes flashGreen {
-            0% { background: rgba(16, 185, 129, 0.6); }
-            100% { background: transparent; }
-        }
-    </style>
+
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+
+<title>DocScan Pro - Jorge</title>
+
+<script src="https://cdn.tailwindcss.com"></script>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+
+<script async src="https://docs.opencv.org/4.x/opencv.js"></script>
+
+<style>
+
+body{
+background:#020617;
+margin:0;
+font-family:sans-serif;
+color:white;
+display:flex;
+flex-direction:column;
+height:100vh;
+}
+
+header{
+background:#0f172a;
+padding:10px;
+display:flex;
+justify-content:space-between;
+align-items:center;
+}
+
+main{
+flex:1;
+display:flex;
+align-items:center;
+justify-content:center;
+background:black;
+position:relative;
+}
+
+footer{
+background:#0f172a;
+padding:10px;
+}
+
+video{
+width:100%;
+height:100%;
+object-fit:contain;
+}
+
+#edit-layer{
+position:absolute;
+inset:0;
+background:black;
+display:none;
+align-items:center;
+justify-content:center;
+}
+
+canvas{
+max-width:90%;
+max-height:90%;
+}
+
+.corner{
+width:30px;
+height:30px;
+background:#10b981;
+border-radius:50%;
+position:absolute;
+transform:translate(-50%,-50%);
+}
+
+</style>
+
 </head>
+
 <body>
 
-    <header class="app-header">
-        <div class="flex items-center gap-2">
-            <div class="bg-emerald-500 p-1.5 rounded-lg text-white">
-                <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                </svg>
-            </div>
-            <span class="font-bold text-white tracking-tight">DocScan Pro</span>
-        </div>
-        <div id="page-counter" class="text-xs font-mono bg-slate-800 px-3 py-1 rounded-full border border-slate-700 text-slate-300">0 PÁGS</div>
-    </header>
+<header>
 
-    <main class="main-content" id="video-container">
-        <video id="video" autoplay playsinline muted class="w-full h-full object-contain"></video>
-        
-        <!-- Capa de Edición -->
-        <div id="edit-layer" class="hidden absolute inset-0 bg-black/95 flex items-center justify-center z-40">
-            <div id="canvas-wrapper">
-                <canvas id="edit-canvas"></canvas>
-                <div id="handles-container" class="absolute inset-0 pointer-events-none">
-                    <div id="h0" class="corner-handle"></div>
-                    <div id="h1" class="corner-handle"></div>
-                    <div id="h2" class="corner-handle"></div>
-                    <div id="h3" class="corner-handle"></div>
-                </div>
-                <svg class="absolute inset-0 w-full h-full pointer-events-none">
-                    <polygon id="poly-guide" points="" fill="rgba(16, 185, 129, 0.2)" stroke="#10b981" stroke-width="3" />
-                </svg>
-            </div>
-        </div>
+<div>DocScan Pro</div>
 
-        <div id="tap-hint" class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-black/60 px-6 py-3 rounded-2xl text-xs font-bold animate-pulse text-center text-white pointer-events-none z-10 hidden">
-            TOCA EL CENTRO PARA CAPTURAR
-        </div>
+<div id="counter">0 PÁGS</div>
 
-        <div id="placeholder" class="absolute inset-0 flex items-center justify-center text-slate-500 bg-slate-900 z-0 text-center p-6">
-            <p>Jorge, presiona Activar Cámara.<br><small class="opacity-50">(Requiere HTTPS o Localhost)</small></p>
-        </div>
-    </main>
+</header>
 
-    <footer class="app-footer">
-        <div class="max-w-md mx-auto space-y-4">
-            
-            <div id="camera-controls">
-                <button id="start-btn" type="button" class="bg-white text-slate-900 px-8 py-3 rounded-xl font-bold w-full shadow-lg active:scale-95 transition-transform">Activar Cámara</button>
-            </div>
+<main id="video-area">
 
-            <div id="edit-controls" class="hidden flex flex-col gap-3">
-                <div class="grid grid-cols-2 gap-3">
-                    <button id="auto-detect-btn" type="button" class="bg-blue-600 text-white py-3 rounded-xl font-bold text-sm shadow-md active:scale-95">Auto-Ajuste</button>
-                    <button id="confirm-warp-btn" type="button" class="bg-emerald-500 text-white py-3 rounded-xl font-bold text-sm shadow-md active:scale-95">Aplanar Página</button>
-                </div>
-                <button id="cancel-edit-btn" type="button" class="bg-slate-800 text-slate-400 py-2 rounded-lg text-xs font-bold uppercase tracking-widest">Descartar Toma</button>
-            </div>
+<video id="video" autoplay playsinline></video>
 
-            <div class="flex items-center justify-between border-t border-slate-800 pt-3">
-                <div class="flex items-center gap-2">
-                    <input type="checkbox" id="filter-bw" class="w-5 h-5 accent-emerald-500" checked>
-                    <label for="filter-bw" class="text-xs font-bold text-slate-400">Blanco y Negro</label>
-                </div>
-                <div class="flex gap-2">
-                    <button id="reset-btn" type="button" class="text-[10px] font-bold text-rose-500 uppercase px-2 py-2">Limpiar</button>
-                    <button id="generate-btn" type="button" disabled class="bg-slate-700 text-slate-500 px-4 py-2 rounded-lg text-xs font-bold shadow-sm">Bajar PDF</button>
-                </div>
-            </div>
-        </div>
-    </footer>
+<div id="edit-layer">
 
-    <script>
-        const { jsPDF } = window.jspdf;
-        const video = document.getElementById('video');
-        const videoContainer = document.getElementById('video-container');
-        const editLayer = document.getElementById('edit-layer');
-        const editCanvas = document.getElementById('edit-canvas');
-        const polyGuide = document.getElementById('poly-guide');
-        const startBtn = document.getElementById('start-btn');
-        const tapHint = document.getElementById('tap-hint');
-        const autoDetectBtn = document.getElementById('auto-detect-btn');
-        const confirmWarpBtn = document.getElementById('confirm-warp-btn');
-        const cancelEditBtn = document.getElementById('cancel-edit-btn');
-        const generateBtn = document.getElementById('generate-btn');
+<canvas id="canvas"></canvas>
 
-        let pages = [];
-        let stream = null;
-        let capturedImage = null;
-        let corners = []; 
-        let isEditing = false;
+<div id="p0" class="corner"></div>
+<div id="p1" class="corner"></div>
+<div id="p2" class="corner"></div>
+<div id="p3" class="corner"></div>
 
-        async function startCamera() {
-            const constraints = [
-                { video: { facingMode: "environment", width: { ideal: 1920 }, height: { ideal: 1080 } } },
-                { video: { facingMode: "environment" } },
-                { video: true }
-            ];
+</div>
 
-            for (const constraint of constraints) {
-                try {
-                    stream = await navigator.mediaDevices.getUserMedia(constraint);
-                    video.srcObject = stream;
-                    document.getElementById('placeholder').classList.add('hidden');
-                    startBtn.parentElement.classList.add('hidden');
-                    tapHint.classList.remove('hidden');
-                    return;
-                } catch (e) { console.log("Reintento..."); }
-            }
-            alert("Jorge, la cámara no abrió. Asegúrate de estar en una conexión segura (HTTPS).");
-        }
+</main>
 
-        function captureToEdit() {
-            if (isEditing || !stream) return;
-            isEditing = true;
+<footer>
 
-            const temp = document.createElement('canvas');
-            temp.width = video.videoWidth;
-            temp.height = video.videoHeight;
-            temp.getContext('2d').drawImage(video, 0, 0);
-            capturedImage = temp;
+<button id="start">Activar cámara</button>
 
-            showEditor();
-        }
+<button id="auto">Auto ajustar</button>
 
-        // Listener de toque en pantalla principal
-        videoContainer.addEventListener('click', (e) => {
-            if (!isEditing && e.target === video) captureToEdit();
-        });
+<button id="scan">Escanear</button>
 
-        function showEditor() {
-            editLayer.classList.remove('hidden');
-            tapHint.classList.add('hidden');
-            document.getElementById('edit-controls').classList.remove('hidden');
+<button id="pdf">Bajar PDF</button>
 
-            editCanvas.width = capturedImage.width;
-            editCanvas.height = capturedImage.height;
-            editCanvas.getContext('2d').drawImage(capturedImage, 0, 0);
+</footer>
 
-            const w = editCanvas.width;
-            const h = editCanvas.height;
-            // Puntos iniciales centrados
-            corners = [{x: w*0.15, y: h*0.15}, {x: w*0.85, y: h*0.15}, {x: w*0.85, y: h*0.85}, {x: w*0.15, y: h*0.85}];
-            
-            setupHandles();
-            updateUI();
-        }
+<script>
 
-        function setupHandles() {
-            for (let i = 0; i < 4; i++) {
-                const h = document.getElementById(`h${i}`);
-                h.onpointerdown = (e) => {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    h.setPointerCapture(e.pointerId);
-                    
-                    const moveHandler = (pe) => {
-                        const rect = editCanvas.getBoundingClientRect();
-                        const scaleX = rect.width / editCanvas.width;
-                        const scaleY = rect.height / editCanvas.height;
-                        
-                        // Limitamos el movimiento dentro del canvas para Jorge
-                        let nx = (pe.clientX - rect.left) / scaleX;
-                        let ny = (pe.clientY - rect.top) / scaleY;
-                        
-                        corners[i].x = Math.max(0, Math.min(editCanvas.width, nx));
-                        corners[i].y = Math.max(0, Math.min(editCanvas.height, ny));
-                        updateUI();
-                    };
+const {jsPDF}=window.jspdf
 
-                    h.onpointermove = moveHandler;
-                    h.onpointerup = () => {
-                        h.onpointermove = null;
-                        h.releasePointerCapture(e.pointerId);
-                    };
-                };
-            }
-        }
+let video=document.getElementById("video")
 
-        function updateUI() {
-            const rect = editCanvas.getBoundingClientRect();
-            const scaleX = rect.width / editCanvas.width;
-            const scaleY = rect.height / editCanvas.height;
+let canvas=document.getElementById("canvas")
 
-            let polyPoints = "";
-            corners.forEach((c, i) => {
-                const h = document.getElementById(`h${i}`);
-                h.style.left = `${c.x * scaleX}px`;
-                h.style.top = `${c.y * scaleY}px`;
-                polyPoints += `${c.x * scaleX},${c.y * scaleY} `;
-            });
-            polyGuide.setAttribute('points', polyPoints);
-        }
+let ctx=canvas.getContext("2d")
 
-        // Lógica de detección automática real
-        autoDetectBtn.onclick = (e) => {
-            e.stopPropagation();
-            const ctx = editCanvas.getContext('2d');
-            const data = ctx.getImageData(0, 0, editCanvas.width, editCanvas.height).data;
-            const w = editCanvas.width;
-            const h = editCanvas.height;
-            
-            let minX = w, maxX = 0, minY = h, maxY = 0;
-            let found = false;
+let stream=null
 
-            // Buscamos pixeles con brillo de "papel"
-            for (let y = 0; y < h; y += 20) {
-                for (let x = 0; x < w; x += 20) {
-                    const i = (y * w + x) * 4;
-                    const brightness = (data[i] + data[i+1] + data[i+2]) / 3;
-                    if (brightness > 140) {
-                        if (x < minX) minX = x; if (x > maxX) maxX = x;
-                        if (y < minY) minY = y; if (y > maxY) maxY = y;
-                        found = true;
-                    }
-                }
-            }
-            if (found) {
-                corners = [{x:minX, y:minY}, {x:maxX, y:minY}, {x:maxX, y:maxY}, {x:minX, y:maxY}];
-                updateUI();
-            }
-        };
+let pages=[]
 
-        function warpAndAdd(e) {
-            e.stopPropagation();
-            
-            const minX = Math.min(...corners.map(c => c.x));
-            const maxX = Math.max(...corners.map(c => c.x));
-            const minY = Math.min(...corners.map(c => c.y));
-            const maxY = Math.max(...corners.map(c => c.y));
-            
-            const sw = maxX - minX;
-            const sh = maxY - minY;
+let captured=null
 
-            if (sw < 50 || sh < 50) return;
+let corners=[]
 
-            const outW = 1000; const outH = 1400; 
-            const canvas = document.createElement('canvas');
-            canvas.width = outW; canvas.height = outH;
-            const ctx = canvas.getContext('2d');
+let editing=false
 
-            // MEJORA: Filtro de contraste para texto nítido
-            ctx.filter = "contrast(140%) brightness(105%)";
-            ctx.drawImage(capturedImage, minX, minY, sw, sh, 0, 0, outW, outH);
-            ctx.filter = "none";
 
-            if (document.getElementById('filter-bw').checked) {
-                const img = ctx.getImageData(0, 0, outW, outH);
-                const d = img.data;
-                for (let i=0; i<d.length; i+=4) {
-                    const g = d[i]*0.3 + d[i+1]*0.59 + d[i+2]*0.11;
-                    const val = g > 130 ? 255 : (g < 75 ? 0 : g);
-                    d[i] = d[i+1] = d[i+2] = val;
-                }
-                ctx.putImageData(img, 0, 0);
-            }
 
-            pages.push({ data: canvas.toDataURL('image/jpeg', 0.65), w: outW, h: outH });
-            
-            videoContainer.classList.add('flash-success');
-            setTimeout(() => videoContainer.classList.remove('flash-success'), 400);
+async function startCamera(){
 
-            closeEditor();
-            updateStats();
-        }
+stream=await navigator.mediaDevices.getUserMedia({
 
-        function closeEditor() {
-            isEditing = false;
-            editLayer.classList.add('hidden');
-            tapHint.classList.remove('hidden');
-            document.getElementById('edit-controls').classList.add('hidden');
-        }
+video:{facingMode:"environment"}
 
-        function updateStats() {
-            document.getElementById('page-counter').innerText = `${pages.length} PÁGS`;
-            if (pages.length > 0) {
-                generateBtn.disabled = false;
-                generateBtn.classList.replace('bg-slate-700', 'bg-blue-600');
-                generateBtn.classList.replace('text-slate-500', 'text-white');
-            }
-        }
+})
 
-        startBtn.onclick = startCamera;
-        confirmWarpBtn.onclick = warpAndAdd;
-        cancelEditBtn.onclick = (e) => { e.stopPropagation(); closeEditor(); };
-        
-        generateBtn.onclick = (e) => {
-            e.stopPropagation();
-            const doc = new jsPDF('p', 'px', [pages[0].w, pages[0].h]);
-            pages.forEach((p, i) => {
-                if (i > 0) doc.addPage([p.w, p.h], 'p');
-                doc.addImage(p.data, 'JPEG', 0, 0, p.w, p.h, null, 'FAST');
-            });
-            doc.save(`Scan_Jorge_${Date.now()}.pdf`);
-        };
+video.srcObject=stream
 
-        document.getElementById('reset-btn').onclick = () => { if(confirm("¿Borrar todo?")) location.reload(); };
-    </script>
+}
+
+
+
+document.getElementById("start").onclick=startCamera
+
+
+
+video.onclick=()=>{
+
+if(editing)return
+
+capture()
+
+}
+
+
+
+function capture(){
+
+canvas.width=video.videoWidth
+
+canvas.height=video.videoHeight
+
+ctx.drawImage(video,0,0)
+
+captured=ctx.getImageData(0,0,canvas.width,canvas.height)
+
+document.getElementById("edit-layer").style.display="flex"
+
+editing=true
+
+corners=[
+
+{x:50,y:50},
+
+{x:canvas.width-50,y:50},
+
+{x:canvas.width-50,y:canvas.height-50},
+
+{x:50,y:canvas.height-50}
+
+]
+
+updateCorners()
+
+}
+
+
+
+function updateCorners(){
+
+corners.forEach((c,i)=>{
+
+let el=document.getElementById("p"+i)
+
+let rect=canvas.getBoundingClientRect()
+
+let sx=rect.width/canvas.width
+
+let sy=rect.height/canvas.height
+
+el.style.left=c.x*sx+"px"
+
+el.style.top=c.y*sy+"px"
+
+})
+
+}
+
+
+
+function autoDetect(){
+
+let src=cv.imread(canvas)
+
+let gray=new cv.Mat()
+
+let blur=new cv.Mat()
+
+let edge=new cv.Mat()
+
+cv.cvtColor(src,gray,cv.COLOR_RGBA2GRAY)
+
+cv.GaussianBlur(gray,blur,new cv.Size(5,5),0)
+
+cv.Canny(blur,edge,75,200)
+
+let contours=new cv.MatVector()
+
+let hierarchy=new cv.Mat()
+
+cv.findContours(edge,contours,hierarchy,cv.RETR_LIST,cv.CHAIN_APPROX_SIMPLE)
+
+let maxArea=0
+
+let best=null
+
+for(let i=0;i<contours.size();i++){
+
+let cnt=contours.get(i)
+
+let area=cv.contourArea(cnt)
+
+if(area>5000){
+
+let peri=cv.arcLength(cnt,true)
+
+let approx=new cv.Mat()
+
+cv.approxPolyDP(cnt,approx,0.02*peri,true)
+
+if(approx.rows===4&&area>maxArea){
+
+best=approx
+
+maxArea=area
+
+}
+
+}
+
+}
+
+if(best){
+
+corners=[]
+
+for(let i=0;i<4;i++){
+
+corners.push({
+
+x:best.intPtr(i,0)[0],
+
+y:best.intPtr(i,0)[1]
+
+})
+
+}
+
+updateCorners()
+
+}
+
+src.delete()
+
+gray.delete()
+
+blur.delete()
+
+edge.delete()
+
+}
+
+
+
+document.getElementById("auto").onclick=autoDetect
+
+
+
+document.getElementById("scan").onclick=()=>{
+
+let minX=Math.min(...corners.map(c=>c.x))
+
+let maxX=Math.max(...corners.map(c=>c.x))
+
+let minY=Math.min(...corners.map(c=>c.y))
+
+let maxY=Math.max(...corners.map(c=>c.y))
+
+let w=maxX-minX
+
+let h=maxY-minY
+
+let temp=document.createElement("canvas")
+
+temp.width=1000
+
+temp.height=1400
+
+let tctx=temp.getContext("2d")
+
+tctx.filter="contrast(140%) brightness(110%)"
+
+tctx.drawImage(canvas,minX,minY,w,h,0,0,1000,1400)
+
+pages.push(temp.toDataURL("image/jpeg",0.7))
+
+document.getElementById("counter").innerText=pages.length+" PÁGS"
+
+editing=false
+
+document.getElementById("edit-layer").style.display="none"
+
+}
+
+
+
+document.getElementById("pdf").onclick=()=>{
+
+if(pages.length==0)return
+
+let doc=new jsPDF("p","px",[1000,1400])
+
+pages.forEach((p,i)=>{
+
+if(i>0)doc.addPage()
+
+doc.addImage(p,"JPEG",0,0,1000,1400)
+
+})
+
+doc.save("Scan_Jorge.pdf")
+
+}
+
+
+
+</script>
+
 </body>
 </html>
