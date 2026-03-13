@@ -7,120 +7,137 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <style>
-        body {
-            height: 100vh;
-            height: -webkit-fill-available;
+        body, html {
+            height: 100%;
+            margin: 0;
             overflow: hidden;
             background-color: #020617;
-            touch-action: none;
-        }
-        .app-container {
-            height: 100vh;
-            height: -webkit-fill-available;
             display: flex;
             flex-direction: column;
+            touch-action: none;
+        }
+        .app-header {
+            height: 60px;
+            background: #0f172a;
+            border-bottom: 1px solid #1e293b;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 15px;
+            flex-shrink: 0;
+        }
+        .main-content {
+            flex: 1;
+            position: relative;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            overflow: hidden;
+            background: #000;
+        }
+        .app-footer {
+            background: #0f172a;
+            border-top: 1px solid #1e293b;
+            padding: 15px;
+            flex-shrink: 0;
+            z-index: 1000;
         }
         .corner-handle { 
-            width: 50px; height: 50px; 
-            background: rgba(16, 185, 129, 0.7); 
-            border: 4px solid white; 
+            width: 44px; height: 44px; 
+            background: rgba(16, 185, 129, 0.8); 
+            border: 3px solid white; 
             border-radius: 50%; 
             position: absolute; 
             pointer-events: auto;
             transform: translate(-50%, -50%); 
-            box-shadow: 0 0 20px rgba(0,0,0,0.6);
-            z-index: 100; 
+            box-shadow: 0 0 15px rgba(0,0,0,0.5);
+            z-index: 200; 
             touch-action: none;
         }
-        .corner-handle:active {
-            background: rgba(16, 185, 129, 1);
-            scale: 1.2;
-        }
-        #video-container {
-            flex: 1;
-            min-height: 0;
+        /* El wrapper del canvas limita el tamaño máximo para que no se salga */
+        #canvas-wrapper {
             position: relative;
-            background: #000;
+            display: inline-block;
+            max-width: 95%;
+            max-height: 95%;
+        }
+        #edit-canvas {
+            max-width: 100%;
+            max-height: 100%;
+            display: block;
         }
     </style>
 </head>
-<body class="text-slate-100 font-sans">
+<body>
 
-    <div class="app-container">
-        <!-- Encabezado -->
-        <header class="p-3 border-b border-slate-800 flex justify-between items-center bg-slate-900 shrink-0">
-            <div class="flex items-center gap-2">
-                <div class="bg-emerald-500 p-1.5 rounded-lg text-white">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                    </svg>
-                </div>
-                <h1 class="text-lg font-bold">DocScan Pro</h1>
+    <header class="app-header">
+        <div class="flex items-center gap-2">
+            <div class="bg-emerald-500 p-1 rounded-lg text-white">
+                <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                </svg>
             </div>
-            <div id="page-counter" class="text-xs font-mono bg-slate-800 px-3 py-1 rounded-full border border-slate-700">0 PÁGS</div>
-        </header>
+            <span class="font-bold text-white">DocScan Pro</span>
+        </div>
+        <div id="page-counter" class="text-xs font-mono bg-slate-800 px-3 py-1 rounded-full border border-slate-700 text-slate-300">0 PÁGS</div>
+    </header>
 
-        <!-- Visor de Cámara / Editor -->
-        <main id="video-container">
-            <video id="video" autoplay playsinline class="w-full h-full object-contain"></video>
+    <main class="main-content" id="video-container">
+        <video id="video" autoplay playsinline class="w-full h-full object-contain"></video>
+        
+        <!-- Capa de Edición -->
+        <div id="edit-layer" class="hidden absolute inset-0 bg-black flex items-center justify-center p-4">
+            <div id="canvas-wrapper">
+                <canvas id="edit-canvas"></canvas>
+                <div id="handles-container" class="absolute inset-0 pointer-events-none">
+                    <div id="h0" class="corner-handle"></div>
+                    <div id="h1" class="corner-handle"></div>
+                    <div id="h2" class="corner-handle"></div>
+                    <div id="h3" class="corner-handle"></div>
+                </div>
+                <svg class="absolute inset-0 w-full h-full pointer-events-none">
+                    <polygon id="poly-guide" points="" fill="rgba(16, 185, 129, 0.2)" stroke="#10b981" stroke-width="2" />
+                </svg>
+            </div>
+        </div>
+
+        <div id="tap-hint" class="hidden absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-black/60 px-6 py-3 rounded-2xl text-xs font-bold animate-pulse text-center text-white">
+            TOCA EL CENTRO PARA ESCANEAR
+        </div>
+
+        <div id="placeholder" class="absolute inset-0 flex items-center justify-center text-slate-500 bg-slate-900">
+            <p>Esperando cámara...</p>
+        </div>
+    </main>
+
+    <footer class="app-footer">
+        <div class="max-w-md mx-auto space-y-4">
             
-            <!-- Capa de Edición -->
-            <div id="edit-layer" class="hidden absolute inset-0 bg-black flex items-center justify-center">
-                <div id="canvas-wrapper" class="relative inline-block">
-                    <canvas id="edit-canvas" class="max-w-full max-h-full block"></canvas>
-                    <div id="handles-container" class="absolute inset-0 pointer-events-none">
-                        <!-- Puntos fijos que no se borran al mover -->
-                        <div id="h0" class="corner-handle"></div>
-                        <div id="h1" class="corner-handle"></div>
-                        <div id="h2" class="corner-handle"></div>
-                        <div id="h3" class="corner-handle"></div>
-                    </div>
-                    <svg class="absolute inset-0 w-full h-full pointer-events-none">
-                        <polygon id="poly-guide" points="" fill="rgba(16, 185, 129, 0.2)" stroke="#10b981" stroke-width="3" />
-                    </svg>
-                </div>
+            <!-- Botones de cámara -->
+            <div id="camera-controls">
+                <button id="start-btn" class="bg-white text-slate-900 px-8 py-3 rounded-xl font-bold w-full shadow-lg">Activar Cámara</button>
             </div>
 
-            <div id="tap-hint" class="hidden absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-black/60 px-6 py-3 rounded-2xl text-sm font-bold animate-pulse text-center">
-                TOCA LA PANTALLA<br>PARA ESCANEAR
+            <!-- Botones de edición -->
+            <div id="edit-controls" class="hidden grid grid-cols-2 gap-3">
+                <button id="auto-detect-btn" class="bg-blue-600 text-white py-3 rounded-xl font-bold text-sm">Auto-Ajuste</button>
+                <button id="confirm-warp-btn" class="bg-emerald-500 text-white py-3 rounded-xl font-bold text-sm">Aplanar Página</button>
+                <button id="cancel-edit-btn" class="col-span-2 bg-slate-800 text-slate-400 py-2 rounded-lg text-xs font-bold uppercase">Descartar</button>
             </div>
 
-            <div id="placeholder" class="absolute inset-0 flex flex-col items-center justify-center text-slate-500 bg-slate-900">
-                <p>Iniciando sistema para Jorge...</p>
-            </div>
-        </main>
-
-        <!-- Controles Inferiores -->
-        <footer class="bg-slate-900 border-t border-slate-800 p-4 shrink-0 shadow-2xl">
-            <div class="max-w-md mx-auto flex flex-col gap-4">
-                
-                <div id="camera-controls">
-                    <button id="start-btn" class="bg-white text-slate-900 px-8 py-3 rounded-xl font-bold w-full active:scale-95">Encender Cámara</button>
+            <!-- Opciones y Guardado -->
+            <div class="flex items-center justify-between border-t border-slate-800 pt-3">
+                <div class="flex items-center gap-2">
+                    <input type="checkbox" id="filter-bw" class="w-5 h-5 accent-emerald-500" checked>
+                    <label for="filter-bw" class="text-xs font-bold text-slate-400">B&N</label>
                 </div>
-
-                <div id="edit-controls" class="hidden flex flex-col gap-3">
-                    <div class="grid grid-cols-2 gap-2">
-                        <button id="auto-detect-btn" class="bg-blue-600 text-white py-3 rounded-xl font-bold flex items-center justify-center gap-2">
-                            <span>Auto-Detectar</span>
-                        </button>
-                        <button id="confirm-warp-btn" class="bg-emerald-500 text-white py-3 rounded-xl font-bold">Aplanar y Añadir</button>
-                    </div>
-                    <button id="cancel-edit-btn" class="bg-slate-800 text-slate-400 py-2 rounded-lg font-bold text-sm">Descartar Toma</button>
-                </div>
-
-                <div class="flex items-center justify-between border-t border-slate-800 pt-3">
-                    <div class="flex items-center gap-2">
-                        <input type="checkbox" id="filter-bw" class="w-5 h-5 accent-emerald-500" checked>
-                        <label for="filter-bw" class="text-xs font-bold text-slate-400">Blanco y Negro</label>
-                    </div>
-                    <div class="flex gap-2">
-                        <button id="reset-btn" class="text-[10px] font-bold text-rose-500 uppercase px-2">Limpiar</button>
-                        <button id="generate-btn" disabled class="bg-slate-800 text-slate-500 px-4 py-2 rounded-lg text-xs font-bold">Bajar PDF</button>
-                    </div>
+                <div class="flex gap-2">
+                    <button id="reset-btn" class="text-[10px] font-bold text-rose-500 uppercase px-2 py-2">Limpiar</button>
+                    <button id="generate-btn" disabled class="bg-slate-700 text-slate-500 px-4 py-2 rounded-lg text-xs font-bold">Bajar PDF</button>
                 </div>
             </div>
-        </footer>
-    </div>
+        </div>
+    </footer>
 
     <script>
         const { jsPDF } = window.jspdf;
@@ -151,7 +168,7 @@
                 document.getElementById('placeholder').classList.add('hidden');
                 startBtn.parentElement.classList.add('hidden');
                 tapHint.classList.remove('hidden');
-            } catch (err) { alert("Jorge, por favor permite el acceso a la cámara."); }
+            } catch (err) { alert("Jorge, activa los permisos de cámara."); }
         }
 
         function captureToEdit() {
@@ -184,62 +201,33 @@
 
             const w = editCanvas.width;
             const h = editCanvas.height;
-            // Posición inicial estándar
-            corners = [
-                { x: w*0.15, y: h*0.15 }, { x: w*0.85, y: h*0.15 },
-                { x: w*0.85, y: h*0.85 }, { x: w*0.15, y: h*0.85 }
-            ];
+            corners = [{x:w*0.1, y:h*0.1}, {x:w*0.9, y:h*0.1}, {x:w*0.9, y:h*0.9}, {x:w*0.1, y:h*0.9}];
             
             setupHandles();
-            autoDetect();
             updateUI();
-        }
-
-        // Detección automática de Jorge: busca el cuadro con más brillo (papel)
-        function autoDetect() {
-            const ctx = editCanvas.getContext('2d');
-            const data = ctx.getImageData(0, 0, editCanvas.width, editCanvas.height).data;
-            const w = editCanvas.width;
-            const h = editCanvas.height;
-            
-            let minX = w, maxX = 0, minY = h, maxY = 0;
-            let count = 0;
-
-            for (let y = 0; y < h; y += 15) {
-                for (let x = 0; x < w; x += 15) {
-                    const i = (y * w + x) * 4;
-                    const brightness = (data[i] + data[i+1] + data[i+2]) / 3;
-                    if (brightness > 150) { // Color de papel
-                        if (x < minX) minX = x; if (x > maxX) maxX = x;
-                        if (y < minY) minY = y; if (y > maxY) maxY = y;
-                        count++;
-                    }
-                }
-            }
-
-            if (count > 100) { // Si detectamos algo que parece papel
-                corners = [
-                    { x: minX, y: minY }, { x: maxX, y: minY },
-                    { x: maxX, y: maxY }, { x: minX, y: maxY }
-                ];
-                updateUI();
-            }
         }
 
         function setupHandles() {
             for (let i = 0; i < 4; i++) {
                 const h = document.getElementById(`h${i}`);
                 h.onpointerdown = (e) => {
+                    e.preventDefault();
                     h.setPointerCapture(e.pointerId);
+                    
                     const moveHandler = (pe) => {
                         const rect = editCanvas.getBoundingClientRect();
                         const scaleX = rect.width / editCanvas.width;
                         const scaleY = rect.height / editCanvas.height;
                         
-                        corners[i].x = Math.max(0, Math.min(editCanvas.width, (pe.clientX - rect.left) / scaleX));
-                        corners[i].y = Math.max(0, Math.min(editCanvas.height, (pe.clientY - rect.top) / scaleY));
+                        // CLAMPING: Evita que los puntos se salgan del canvas
+                        let newX = (pe.clientX - rect.left) / scaleX;
+                        let newY = (pe.clientY - rect.top) / scaleY;
+                        
+                        corners[i].x = Math.max(0, Math.min(editCanvas.width, newX));
+                        corners[i].y = Math.max(0, Math.min(editCanvas.height, newY));
                         updateUI();
                     };
+
                     h.onpointermove = moveHandler;
                     h.onpointerup = () => {
                         h.onpointermove = null;
@@ -264,15 +252,36 @@
             polyGuide.setAttribute('points', polyPoints);
         }
 
+        function autoDetect() {
+            const ctx = editCanvas.getContext('2d');
+            const data = ctx.getImageData(0, 0, editCanvas.width, editCanvas.height).data;
+            const w = editCanvas.width;
+            const h = editCanvas.height;
+            let minX = w, maxX = 0, minY = h, maxY = 0;
+            let found = false;
+
+            for (let y = 0; y < h; y += 20) {
+                for (let x = 0; x < w; x += 20) {
+                    const i = (y * w + x) * 4;
+                    if ((data[i] + data[i+1] + data[i+2]) / 3 > 140) {
+                        if (x < minX) minX = x; if (x > maxX) maxX = x;
+                        if (y < minY) minY = y; if (y > maxY) maxY = y;
+                        found = true;
+                    }
+                }
+            }
+            if (found) {
+                corners = [{x:minX, y:minY}, {x:maxX, y:minY}, {x:maxX, y:maxY}, {x:minX, y:maxY}];
+                updateUI();
+            }
+        }
+
         function warpAndAdd() {
-            // Dimensiones para alta calidad
-            const outW = 1200; 
-            const outH = 1650; 
+            const outW = 1000; const outH = 1400; 
             const canvas = document.createElement('canvas');
             canvas.width = outW; canvas.height = outH;
             const ctx = canvas.getContext('2d');
 
-            // Recorte inteligente (Jorge, esto "aplana" el documento)
             ctx.drawImage(capturedImage, 
                 corners[0].x, corners[0].y, 
                 corners[1].x - corners[0].x, corners[3].y - corners[0].y, 
@@ -284,7 +293,7 @@
                 const d = img.data;
                 for (let i=0; i<d.length; i+=4) {
                     const g = d[i]*0.3 + d[i+1]*0.59 + d[i+2]*0.11;
-                    const v = g > 135 ? 255 : (g < 75 ? 0 : g);
+                    const v = g > 130 ? 255 : (g < 70 ? 0 : g);
                     d[i] = d[i+1] = d[i+2] = v;
                 }
                 ctx.putImageData(img, 0, 0);
@@ -304,9 +313,9 @@
 
         function updateStats() {
             document.getElementById('page-counter').innerText = `${pages.length} PÁGS`;
-            generateBtn.disabled = pages.length === 0;
             if (pages.length > 0) {
-                generateBtn.classList.replace('bg-slate-800', 'bg-blue-600');
+                generateBtn.disabled = false;
+                generateBtn.classList.replace('bg-slate-700', 'bg-blue-600');
                 generateBtn.classList.replace('text-slate-500', 'text-white');
             }
         }
@@ -315,17 +324,15 @@
         autoDetectBtn.onclick = autoDetect;
         confirmWarpBtn.onclick = warpAndAdd;
         cancelEditBtn.onclick = closeEditor;
-        
         generateBtn.onclick = () => {
             const doc = new jsPDF('p', 'px', [pages[0].w, pages[0].h]);
             pages.forEach((p, i) => {
                 if (i > 0) doc.addPage([p.w, p.h], 'p');
                 doc.addImage(p.data, 'JPEG', 0, 0, p.w, p.h);
             });
-            doc.save(`Escaneo_Jorge_${Date.now()}.pdf`);
+            doc.save(`Scan_Jorge_${Date.now()}.pdf`);
         };
-
-        document.getElementById('reset-btn').onclick = () => { if(confirm("¿Borrar todo?")) { pages = []; updateStats(); }};
+        document.getElementById('reset-btn').onclick = () => { if(confirm("¿Borrar todo?")) { pages = []; updateStats(); location.reload(); }};
         window.onresize = () => { if(isEditing) updateUI(); };
     </script>
 </body>
